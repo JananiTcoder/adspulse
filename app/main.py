@@ -1,7 +1,4 @@
 import logging
-import json
-from datetime import date
-
 from fastapi import FastAPI, Request, Form, Depends, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -28,12 +25,34 @@ def startup():
 
 
 @app.get("/", response_class=HTMLResponse)
-def home(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+def home(request: Request, db: Session = Depends(get_db), added: str = None, error: str = None):
+    users = (
+        db.query(models.User)
+        .filter(models.User.is_active == True)
+        .order_by(models.User.created_at.desc())
+        .all()
+    )
+    last_reports = {}
+    for user in users:
+        report = (
+            db.query(models.Report)
+            .filter(models.Report.user_id == user.id)
+            .order_by(models.Report.created_at.desc())
+            .first()
+        )
+        last_reports[user.id] = report
+
+    return templates.TemplateResponse("index.html", {
+        "request": request,
+        "users": users,
+        "last_reports": last_reports,
+        "added": added,
+        "error": error,
+    })
 
 
-@app.post("/register")
-def register(
+@app.post("/add-client")
+def add_client(
     request: Request,
     company_name: str = Form(...),
     email: str = Form(...),
@@ -42,36 +61,25 @@ def register(
 ):
     clean_id = customer_id.replace("-", "").strip()
     if not clean_id.isdigit():
-        return templates.TemplateResponse("index.html", {
-            "request": request,
-            "error": "Please enter a valid Google Ads Customer ID (digits only, e.g. 531-300-6442).",
-        })
+        return RedirectResponse("/?error=Invalid+Customer+ID+format", status_code=302)
+
     existing = db.query(models.User).filter(models.User.email == email).first()
     if existing:
-        return RedirectResponse(f"/dashboard/{email}", status_code=302)
+        return RedirectResponse(f"/?error=Email+already+registered", status_code=302)
+
     user = models.User(company_name=company_name, email=email, customer_id=clean_id)
     db.add(user)
     db.commit()
-    db.refresh(user)
-    return templates.TemplateResponse("success.html", {
-        "request": request, "company_name": company_name,
-        "email": email, "user_id": user.id,
-    })
+    return RedirectResponse(f"/?added={company_name}", status_code=302)
 
 
-@app.get("/dashboard/{email}", response_class=HTMLResponse)
-def dashboard(request: Request, email: str, db: Session = Depends(get_db)):
-    user = db.query(models.User).filter(models.User.email == email).first()
-    if not user:
-        return RedirectResponse("/")
-    reports = (
-        db.query(models.Report)
-        .filter(models.Report.user_id == user.id)
-        .order_by(models.Report.created_at.desc())
-        .limit(30)
-        .all()
-    )
-    return templates.TemplateResponse("dashboard.html", {"request": request, "user": user, "reports": reports})
+@app.post("/remove-client/{user_id}")
+def remove_client(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if user:
+        user.is_active = False
+        db.commit()
+    return RedirectResponse("/", status_code=302)
 
 
 @app.post("/generate/{user_id}")

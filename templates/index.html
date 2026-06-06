@@ -3,126 +3,155 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AdsPulse — Daily Google Ads Intelligence</title>
+  <title>AdsPulse — Admin Panel</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 
 <nav>
   <div class="logo">Ads<span>Pulse</span></div>
-  <div style="font-size:13px;color:#64748b;">Free during beta</div>
+  <div class="nav-tag">Admin Panel</div>
 </nav>
 
-<section class="hero">
-  <h1>Your Google Ads.<br>Explained daily. In your inbox.</h1>
-  <p>Stop logging into dashboards. Get a plain-English AI report every morning — what worked, what wasted money, and what to do next.</p>
-  <div class="features">
-    <span class="feature-chip">📊 Campaign performance</span>
-    <span class="feature-chip">⚠️ Budget waste alerts</span>
-    <span class="feature-chip">🔥 Winning campaigns</span>
-    <span class="feature-chip">🤖 AI-written summary</span>
-    <span class="feature-chip">📧 Daily email delivery</span>
-  </div>
-</section>
+<div class="admin-wrap">
 
-<div style="background:linear-gradient(135deg,#4f46e5,#7c3aed);padding-bottom:60px;">
-  <div class="card" style="max-width:480px;margin:0 auto;position:relative;top:-1px;">
-    <h2>Get started free</h2>
-    <p class="sub">Connect once. Reports arrive every morning at 12 AM.</p>
+  <!-- Add Client -->
+  <div class="add-card">
+    <h2>Add Client</h2>
+    <p class="sub">Client will automatically receive a Google Ads report every day at 12 AM.</p>
 
     {% if error %}
     <div class="error-box">{{ error }}</div>
     {% endif %}
+    {% if added %}
+    <div class="success-box">✓ {{ added }} added — daily reports are now active.</div>
+    {% endif %}
 
-    <form method="post" action="/register">
-      <div class="form-group">
-        <label>Company Name</label>
-        <input type="text" name="company_name" placeholder="Acme Marketing" required>
+    <form method="post" action="/add-client" class="add-form">
+      <div class="add-fields">
+        <div class="form-group">
+          <label>Company Name</label>
+          <input type="text" name="company_name" placeholder="Acme Corp" required>
+        </div>
+        <div class="form-group">
+          <label>Client Email</label>
+          <input type="email" name="email" placeholder="client@company.com" required>
+        </div>
+        <div class="form-group">
+          <label>Google Ads Customer ID</label>
+          <input type="text" name="customer_id" placeholder="531-300-6442" required>
+        </div>
+        <div class="form-group form-group--btn">
+          <button type="submit" class="btn-add">+ Add Client</button>
+        </div>
       </div>
-      <div class="form-group">
-        <label>Your Email</label>
-        <input type="email" name="email" placeholder="you@company.com" required>
-        <div class="hint">Daily reports will be sent here</div>
-      </div>
-      <div class="form-group">
-        <label>Google Ads Customer ID</label>
-        <input type="text" name="customer_id" placeholder="531-300-6442" required>
-        <div class="hint">Find this in Google Ads → top-right corner (format: XXX-XXX-XXXX)</div>
-      </div>
-      <button type="submit" class="btn">🚀 Start getting daily reports</button>
     </form>
   </div>
+
+  <!-- Clients Table -->
+  <div class="clients-section">
+    <div class="section-header">
+      <h2>Clients <span class="count">{{ users|length }}</span></h2>
+      <div class="section-note">Reports sent daily at 12:00 AM UTC</div>
+    </div>
+
+    {% if not users %}
+    <div class="empty-table">
+      <div class="empty-icon">📋</div>
+      <div>No clients yet. Add your first client above.</div>
+    </div>
+    {% else %}
+    <div class="table-wrap">
+      <table class="clients-table">
+        <thead>
+          <tr>
+            <th>Company</th>
+            <th>Email</th>
+            <th>Customer ID</th>
+            <th>Added</th>
+            <th>Last Report</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for user in users %}
+          {% set report = last_reports.get(user.id) %}
+          <tr id="row-{{ user.id }}">
+            <td class="td-company">{{ user.company_name }}</td>
+            <td class="td-email">{{ user.email }}</td>
+            <td class="td-cid">{{ user.customer_id[:3] }}-{{ user.customer_id[3:6] }}-{{ user.customer_id[6:] }}</td>
+            <td class="td-date">{{ user.created_at.strftime('%b %d, %Y') }}</td>
+            <td class="td-date">
+              {% if report %}{{ report.date }}{% else %}—{% endif %}
+            </td>
+            <td>
+              {% if report %}
+                <span class="badge badge-{{ report.email_status }}">{{ report.email_status }}</span>
+              {% else %}
+                <span class="badge badge-pending">no report</span>
+              {% endif %}
+            </td>
+            <td class="td-actions">
+              <button
+                class="send-btn"
+                id="send-{{ user.id }}"
+                onclick="sendNow({{ user.id }})">
+                ⚡ Send Now
+              </button>
+              <form method="post" action="/remove-client/{{ user.id }}"
+                    onsubmit="return confirm('Remove {{ user.company_name }}?')"
+                    style="display:inline;">
+                <button type="submit" class="remove-btn">✕</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+
 </div>
 
-<section class="how">
-  <h2>How AdsPulse works</h2>
-  <p class="sub">Set it up once. Reports arrive every day — no action required.</p>
-  <div class="steps">
-    <div class="step">
-      <div class="step-num">1</div>
-      <div class="step-icon">📝</div>
-      <h3>Register</h3>
-      <p>Enter your email and Google Ads Customer ID. Takes 30 seconds.</p>
-    </div>
-    <div class="step">
-      <div class="step-num">2</div>
-      <div class="step-icon">🔗</div>
-      <h3>Connect</h3>
-      <p>We securely access your campaign data via the Google Ads API.</p>
-    </div>
-    <div class="step">
-      <div class="step-num">3</div>
-      <div class="step-icon">🤖</div>
-      <h3>AI Analyzes</h3>
-      <p>Our AI reads your data and writes a plain-English executive brief.</p>
-    </div>
-    <div class="step">
-      <div class="step-num">4</div>
-      <div class="step-icon">📧</div>
-      <h3>You Read</h3>
-      <p>Every morning, open your inbox. Know exactly what happened and what to do.</p>
-    </div>
-  </div>
-</section>
+<script>
+async function sendNow(userId) {
+  const btn = document.getElementById('send-' + userId);
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+  btn.classList.add('sending');
 
-<section style="background:#f1f5f9;padding:64px 32px;text-align:center;">
-  <h2 style="font-size:24px;font-weight:700;margin-bottom:8px;">What the report looks like</h2>
-  <p style="color:#64748b;margin-bottom:40px;">A real email you'd receive every morning.</p>
-  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.1);text-align:left;">
-    <div style="background:linear-gradient(135deg,#4f46e5,#7c3aed);padding:24px;color:white;">
-      <div style="font-size:12px;color:#c4b5fd;letter-spacing:1px;">ADSPULSE DAILY REPORT</div>
-      <div style="font-size:20px;font-weight:700;margin-top:4px;">Your Company</div>
-      <div style="font-size:13px;color:#ddd6fe;">June 6, 2026</div>
-    </div>
-    <div style="padding:24px;">
-      <div style="display:flex;gap:16px;margin-bottom:20px;">
-        <div style="flex:1;text-align:center;background:#f8fafc;border-radius:8px;padding:12px;">
-          <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;">Spend</div>
-          <div style="font-size:20px;font-weight:700;margin-top:2px;">$127.40</div>
-        </div>
-        <div style="flex:1;text-align:center;background:#f8fafc;border-radius:8px;padding:12px;">
-          <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;">Clicks</div>
-          <div style="font-size:20px;font-weight:700;margin-top:2px;">342</div>
-        </div>
-        <div style="flex:1;text-align:center;background:#f8fafc;border-radius:8px;padding:12px;">
-          <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;">Conversions</div>
-          <div style="font-size:20px;font-weight:700;margin-top:2px;color:#16a34a;">14</div>
-        </div>
-      </div>
-      <div style="background:#f0f9ff;border-left:4px solid #4f46e5;border-radius:0 8px 8px 0;padding:16px;font-size:14px;color:#1e293b;line-height:1.7;">
-        Your Summer Sale campaign is performing exceptionally well — 8.2% click-through rate, nearly triple your account average. However, Competitor Keywords has spent $127 over 7 days with zero conversions. That budget would generate 40% more leads if moved to Summer Sale...
-      </div>
-      <div style="margin-top:12px;background:#fef9c3;border-radius:8px;padding:12px;font-size:13px;">
-        ⚠️ <strong>Budget Waste:</strong> Competitor Keywords — $127 spent, 0 conversions (7 days)
-      </div>
-    </div>
-  </div>
-</section>
+  try {
+    const res = await fetch('/generate/' + userId, {method: 'POST'});
+    const data = await res.json();
+    if (data.status === 'success') {
+      btn.textContent = '✓ Sent!';
+      btn.classList.remove('sending');
+      btn.classList.add('sent');
+    } else if (data.status === 'skipped_already_sent') {
+      btn.textContent = '✓ Already sent today';
+      btn.classList.remove('sending');
+      btn.classList.add('sent');
+    } else {
+      btn.textContent = '✗ ' + (data.error || 'Failed');
+      btn.classList.remove('sending');
+      btn.classList.add('failed');
+    }
+  } catch (e) {
+    btn.textContent = '✗ Error';
+    btn.classList.remove('sending');
+    btn.classList.add('failed');
+  }
 
-<footer style="background:#1e293b;color:#94a3b8;text-align:center;padding:32px;">
-  <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:8px;">Ads<span style="color:#7c3aed;">Pulse</span></div>
-  <div style="font-size:13px;">Daily Google Ads intelligence, delivered to your inbox.</div>
-</footer>
+  setTimeout(() => {
+    btn.disabled = false;
+    btn.textContent = '⚡ Send Now';
+    btn.className = 'send-btn';
+    location.reload();
+  }, 3000);
+}
+</script>
 
 </body>
 </html>
