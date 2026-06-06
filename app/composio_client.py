@@ -13,14 +13,18 @@ def get_toolset():
     return _toolset
 
 
-def execute(action: str, params: dict, entity_id: str = "default") -> dict:
+def execute(action: str, params: dict, connected_account_id: str = None) -> dict:
     toolset = get_toolset()
-    result = toolset.execute_action(
-        action=action,
-        params=params,
-        entity_id=entity_id,
-    )
-    if not result.get("successful", False):
+    kwargs = {
+        "action": action,
+        "params": params,
+        "entity_id": "default",
+    }
+    if connected_account_id:
+        kwargs["connected_account_id"] = connected_account_id
+    result = toolset.execute_action(**kwargs)
+    ok = result.get("successful") or result.get("successfull") or False
+    if not ok:
         error = result.get("error") or result.get("data", {})
         raise RuntimeError(f"Composio action '{action}' failed: {error}")
     return result.get("data", {})

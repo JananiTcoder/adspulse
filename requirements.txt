@@ -5,7 +5,7 @@ python-multipart==0.0.12
 sqlalchemy==2.0.36
 aiosqlite==0.20.0
 alembic==1.14.0
-composio-core==0.6.9
+composio-core==0.7.21
 groq==0.11.0
 apscheduler==3.10.4
 pydantic-settings==2.6.1
