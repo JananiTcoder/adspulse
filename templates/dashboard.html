@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — {{ user.company_name }} — AdsPulse</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<nav>
+  <div class="logo">Ads<span>Pulse</span></div>
+  <div style="font-size:13px;color:#64748b;">{{ user.company_name }}</div>
+</nav>
+
+<div class="dash-header">
+  <h1>{{ user.company_name }}</h1>
+  <p>{{ user.email }} &nbsp;·&nbsp; Customer ID: {{ user.customer_id }}</p>
+  <form method="post" action="/generate/{{ user.id }}" style="margin-top:20px;">
+    <button type="submit" style="
+      background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);
+      color:white;padding:10px 20px;border-radius:8px;font-size:14px;
+      font-weight:600;cursor:pointer;transition:background .2s;"
+      onmouseover="this.style.background='rgba(255,255,255,.3)'"
+      onmouseout="this.style.background='rgba(255,255,255,.2)'">
+      ⚡ Generate Report Now
+    </button>
+  </form>
+</div>
+
+<div class="dash-body">
+
+  {% if not reports %}
+  <div class="report-card">
+    <div class="empty">
+      <div class="empty-icon">💭</div>
+      <div>No reports yet.</div>
+      <div style="font-size:13px;margin-top:6px;">
+        Your first report will arrive at 12 AM, or click "Generate Report Now" above.
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% for report in reports %}
+  <div class="report-card">
+    <div class="report-card-header">
+      <div class="report-date">📅 {{ report.date }}</div>
+      <span class="badge badge-{{ report.email_status }}">{{ report.email_status }}</span>
+    </div>
+    <div class="metrics-row">
+      <div class="metric">
+        <div class="metric-label">Spend</div>
+        <div class="metric-value">${{ "%.2f"|format(report.total_spend) }}</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Clicks</div>
+        <div class="metric-value">{{ report.total_clicks }}</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Impressions</div>
+        <div class="metric-value">{{ report.total_impressions }}</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Conversions</div>
+        <div class="metric-value" style="color:#16a34a;">{{ report.total_conversions }}</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Avg CPC</div>
+        <div class="metric-value">${{ "%.2f"|format(report.avg_cpc) }}</div>
+      </div>
+    </div>
+    {% if report.ai_narrative %}
+    <div class="narrative">{{ report.ai_narrative }}</div>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+</div>
+
+</body>
+</html>

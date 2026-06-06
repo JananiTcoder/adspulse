@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>You're In! — AdsPulse</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<nav>
+  <div class="logo">Ads<span>Pulse</span></div>
+</nav>
+
+<div class="success-wrap">
+  <div class="success-icon">🎉</div>
+  <h1>You're connected!</h1>
+  <p>Welcome, <strong>{{ company_name }}</strong>.<br>
+     Daily reports will arrive at <strong>{{ email }}</strong> every morning.</p>
+
+  <div style="background:#f0f9ff;border:1px solid #bfdbfe;border-radius:12px;padding:24px;margin-top:32px;text-align:left;">
+    <div style="font-size:13px;font-weight:600;color:#1d4ed8;margin-bottom:12px;">WHAT HAPPENS NEXT</div>
+    <div style="font-size:14px;color:#374151;line-height:1.8;">
+      ✅ &nbsp;Your account is connected<br>
+      📊 &nbsp;We fetch your Google Ads data daily at 12 AM<br>
+      🤖 &nbsp;AI writes your executive briefing<br>
+      📧 &nbsp;You get an email by the time you wake up
+    </div>
+  </div>
+
+  <div style="margin-top:32px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:24px;">
+    <div style="font-size:14px;font-weight:600;margin-bottom:8px;">Want to see it now?</div>
+    <p style="font-size:13px;color:#64748b;margin-bottom:16px;">Generate your first report immediately — don't wait until midnight.</p>
+    <form method="post" action="/generate/{{ user_id }}">
+      <button type="submit" class="generate-btn" style="width:100%;padding:12px;">
+        ⚡ Generate Report Now
+      </button>
+    </form>
+  </div>
+
+  <a href="/dashboard/{{ email }}" class="btn" style="margin-top:24px;text-decoration:none;display:block;text-align:center;">
+    View My Dashboard →
+  </a>
+</div>
+
+</body>
+</html>
