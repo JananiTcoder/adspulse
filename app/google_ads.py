@@ -1,5 +1,9 @@
+"""
+Fetch yesterday's Google Ads campaign metrics via Composio.
+"""
 import logging
 from datetime import date, timedelta
+
 from .composio_client import execute
 
 logger = logging.getLogger(__name__)
@@ -9,7 +13,11 @@ def _yesterday() -> str:
     return (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
 
 
-def _flatten_rows(data: dict) -> list:
+def _flatten_rows(data: dict) -> list[dict]:
+    """
+    Composio streams GAQL results as nested envelopes:
+      data -> results (list of envelopes) -> response.data.results (list of rows)
+    """
     envs = data.get("results") or []
     rows = []
     for env in envs:
@@ -19,7 +27,12 @@ def _flatten_rows(data: dict) -> list:
 
 
 def fetch_campaign_metrics(customer_id: str) -> dict:
+    """
+    Return aggregated account metrics + per-campaign breakdown for yesterday.
+    customer_id: digits only, e.g. '5313006442'
+    """
     yesterday = _yesterday()
+
     gaql = f"""
         SELECT
             campaign.id,
@@ -37,34 +50,59 @@ def fetch_campaign_metrics(customer_id: str) -> dict:
         ORDER BY metrics.cost_micros DESC
         LIMIT 50
     """
+
     logger.info("Fetching Google Ads data for customer %s on %s", customer_id, yesterday)
-    raw = execute(
-        action="GOOGLEADS_SEARCH_STREAM_GAQL",
-        params={"query": gaql.strip()},
-    )
-    rows = _flatten_rows(raw)
+
+    try:
+        raw = execute(
+            action="GOOGLEADS_SEARCH_STREAM_GAQL",
+            params={"query": gaql.strip()},
+        )
+        rows = _flatten_rows(raw)
+    except Exception as exc:
+        logger.warning("Google Ads data unavailable: %s — returning zero metrics", exc)
+        return {
+            "date": yesterday,
+            "customer_id": customer_id,
+            "summary": {
+                "total_spend": 0.0,
+                "total_clicks": 0,
+                "total_impressions": 0,
+                "total_conversions": 0.0,
+                "avg_cpc": 0.0,
+                "campaign_count": 0,
+            },
+            "campaigns": [],
+        }
+
     campaigns = []
-    total_clicks = total_impressions = total_cost_micros = 0
+    total_clicks = 0
+    total_impressions = 0
+    total_cost_micros = 0
     total_conversions = 0.0
 
     for row in rows:
         m = row.get("metrics") or {}
         c = row.get("campaign") or {}
         b = row.get("campaignBudget") or {}
+
         clicks = int(m.get("clicks") or 0)
         impressions = int(m.get("impressions") or 0)
         cost_micros = int(m.get("costMicros") or 0)
         conversions = float(m.get("conversions") or 0)
         avg_cpc_micros = int(m.get("averageCpc") or 0)
         budget_micros = int(b.get("amountMicros") or 0)
+
         spend = cost_micros / 1_000_000
         avg_cpc = avg_cpc_micros / 1_000_000
         ctr = (clicks / impressions * 100) if impressions > 0 else 0.0
         budget_usd = budget_micros / 1_000_000
+
         total_clicks += clicks
         total_impressions += impressions
         total_cost_micros += cost_micros
         total_conversions += conversions
+
         campaigns.append({
             "id": c.get("id", ""),
             "name": c.get("name", "Unknown Campaign"),
@@ -80,6 +118,7 @@ def fetch_campaign_metrics(customer_id: str) -> dict:
 
     total_spend = total_cost_micros / 1_000_000
     total_avg_cpc = (total_cost_micros / total_clicks / 1_000_000) if total_clicks > 0 else 0.0
+
     return {
         "date": yesterday,
         "customer_id": customer_id,
@@ -95,19 +134,37 @@ def fetch_campaign_metrics(customer_id: str) -> dict:
     }
 
 
-def detect_anomalies(campaigns: list) -> list:
+def detect_anomalies(campaigns: list[dict]) -> list[dict]:
+    """Simple rule-based anomaly detection."""
     anomalies = []
     if not campaigns:
         return anomalies
-    avg_ctr = sum(c["ctr"] for c in campaigns) / len(campaigns)
+
+    avg_ctr = sum(c["ctr"] for c in campaigns) / len(campaigns) if campaigns else 0
+
     for c in campaigns:
         if c["spend"] > 20 and c["conversions"] == 0:
-            anomalies.append({"type": "budget_waste", "campaign": c["name"],
-                              "detail": f"${c['spend']:.2f} spent, 0 conversions", "severity": "warning"})
+            anomalies.append({
+                "type": "budget_waste",
+                "campaign": c["name"],
+                "detail": f"${c['spend']:.2f} spent, 0 conversions",
+                "severity": "warning",
+            })
+
         if avg_ctr > 0 and c["ctr"] >= avg_ctr * 2 and c["clicks"] > 10:
-            anomalies.append({"type": "winning", "campaign": c["name"],
-                              "detail": f"{c['ctr']:.1f}% CTR (2x account average)", "severity": "positive"})
+            anomalies.append({
+                "type": "winning",
+                "campaign": c["name"],
+                "detail": f"{c['ctr']:.1f}% CTR (2x account average)",
+                "severity": "positive",
+            })
+
         if c["budget"] > 0 and c["spend"] >= c["budget"] * 0.9:
-            anomalies.append({"type": "budget_cap", "campaign": c["name"],
-                              "detail": f"${c['spend']:.2f} of ${c['budget']:.2f} daily budget used", "severity": "info"})
+            anomalies.append({
+                "type": "budget_cap",
+                "campaign": c["name"],
+                "detail": f"${c['spend']:.2f} of ${c['budget']:.2f} daily budget used",
+                "severity": "info",
+            })
+
     return anomalies
