@@ -1,5 +1,5 @@
 import logging
-import anthropic
+from groq import Groq
 from .config import settings
 
 logger = logging.getLogger(__name__)
@@ -66,18 +66,20 @@ def _fallback_narrative(metrics: dict, anomalies: list) -> str:
 
 
 def generate_narrative(metrics: dict, anomalies: list) -> str:
-    if not settings.ANTHROPIC_API_KEY:
-        logger.warning("No ANTHROPIC_API_KEY — using fallback narrative")
+    if not settings.GROQ_API_KEY:
+        logger.warning("No GROQ_API_KEY — using fallback narrative")
         return _fallback_narrative(metrics, anomalies)
     try:
-        client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
-        message = client.messages.create(
-            model="claude-haiku-4-5-20251001",
+        client = Groq(api_key=settings.GROQ_API_KEY)
+        completion = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
             max_tokens=400,
-            messages=[{"role": "user", "content": _build_prompt(metrics, anomalies)}],
-            system=SYSTEM_PROMPT,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": _build_prompt(metrics, anomalies)},
+            ],
         )
-        return message.content[0].text.strip()
+        return completion.choices[0].message.content.strip()
     except Exception as exc:
-        logger.error("Claude API error: %s — using fallback", exc)
+        logger.error("Groq API error: %s — using fallback", exc)
         return _fallback_narrative(metrics, anomalies)
